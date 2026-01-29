@@ -81,6 +81,63 @@ def get_city_from_zip(zip_code: str) -> tuple[str, str] | None:  # type: ignore[
         return None
 
 
+def _is_pickup_in_alert_week(pickup_date: datetime.date, week_of: str) -> bool:
+    """
+    Check if a pickup date falls within the service alert week.
+
+    Args:
+        pickup_date: The pickup date to check
+        week_of: Week string from service alert (e.g., "jan. 26" or "Jan. 26")
+
+    Returns:
+        True if pickup is in the alert week, False otherwise
+    """
+    try:
+        # Parse the week_of string (e.g., "jan. 26")
+        # Format: "Month Day" where month may have period
+        import re
+        from datetime import datetime as dt
+
+        # Clean up the string and parse
+        week_str = week_of.strip().replace(".", "").title()
+
+        # Try to parse with current year first
+        year = pickup_date.year
+        try:
+            # Try "Jan 26" format
+            week_start_date = dt.strptime(f"{week_str} {year}", "%b %d %Y").date()
+        except ValueError:
+            # Try full month name
+            week_start_date = dt.strptime(f"{week_str} {year}", "%B %d %Y").date()
+
+        # If parsed date is way in the past (earlier than 6 months ago), use next year
+        today = datetime.now().date()
+        if week_start_date < today - timedelta(days=180):
+            week_start_date = week_start_date.replace(year=year + 1)
+
+        # Calculate week boundaries (Monday-Sunday)
+        # The week_of date might be mid-week, so find the Monday of that week
+        days_to_monday = week_start_date.weekday()
+        week_start = week_start_date - timedelta(days=days_to_monday)
+        week_end = week_start + timedelta(days=6)
+
+        result = week_start <= pickup_date <= week_end
+        _LOGGER.debug(
+            "Alert week check: pickup=%s, week_of=%s, week=%s to %s, result=%s",
+            pickup_date,
+            week_of,
+            week_start,
+            week_end,
+            result,
+        )
+        return result
+
+    except Exception as e:
+        _LOGGER.warning("Failed to parse week_of '%s': %s - applying delay to all weeks", week_of, e)
+        # If we can't parse, assume it applies (safer to delay than miss a delay)
+        return True
+
+
 def apply_holiday_delays(pickup_date: datetime.date, holidays: list) -> datetime.date:
     """Apply holiday delays to a pickup date."""
     # Check for holidays in the week of the pickup
@@ -141,16 +198,31 @@ def calculate_next_pickup(
 
     next_pickup = from_date + timedelta(days=days_ahead)
 
-    # Apply service alert delays first
+    # Apply service alert delays only if pickup is in the affected week
     if service_alert and service_alert.get("has_delay"):
-        delay_days = service_alert.get("delay_days", 0)
-        if delay_days > 0:
-            next_pickup += timedelta(days=delay_days)
-            _LOGGER.debug(
-                "Applied service alert delay of %d day(s) to %s",
-                delay_days,
-                next_pickup,
-            )
+        week_of = service_alert.get("week_of")
+        if week_of:
+            # Parse week_of date (e.g., "jan. 26" or "Jan. 26")
+            if _is_pickup_in_alert_week(next_pickup, week_of):
+                delay_days = service_alert.get("delay_days", 0)
+                if delay_days > 0:
+                    next_pickup += timedelta(days=delay_days)
+                    _LOGGER.debug(
+                        "Applied service alert delay of %d day(s) to %s (week of %s)",
+                        delay_days,
+                        next_pickup,
+                        week_of,
+                    )
+        else:
+            # No week specified - apply to all pickups (rare case)
+            delay_days = service_alert.get("delay_days", 0)
+            if delay_days > 0:
+                next_pickup += timedelta(days=delay_days)
+                _LOGGER.debug(
+                    "Applied service alert delay of %d day(s) to %s (no week specified)",
+                    delay_days,
+                    next_pickup,
+                )
 
     # Then apply holiday delays
     next_pickup = apply_holiday_delays(next_pickup, holidays)

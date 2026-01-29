@@ -15,7 +15,16 @@ A custom Home Assistant integration for Rumpke Waste & Recycling services, provi
 
 ## Features
 
-### Sensors
+### Calendar
+- **Pickup Schedule** - Calendar view of all upcoming pickup dates (3 months ahead)
+  - Shows weekly pickups on your configured service day
+  - Automatically applies holiday delays
+  - Automatically applies service alert delays for affected weeks
+  - **Dynamic updates**: Calendar events recalculate when service alerts change
+  - Works with Home Assistant calendar dashboards and automations
+  - No additional API calls (shares data with sensor)
+
+### Sensor
 - **Next Pickup Date** - Shows your next scheduled garbage/recycling pickup date
   - Automatically factors in your normal service day
   - Applies holiday schedule delays (11 major holidays)
@@ -32,7 +41,7 @@ All sensors include detailed attributes for automations and dashboards:
 - `days_until_pickup` - Days until next pickup
 - `pickup_date` - Formatted pickup date string
 - `service_alert` - Active alert type (if any)
-- `service_alert_text` - Full alert message
+- `service_alert_text` - Full alert message (without county prefix)
 - `last_update` - Last data refresh timestamp
 
 ## Installation
@@ -110,6 +119,20 @@ The sensor calculates your next pickup date by:
 4. Applying any holiday delays for that week
 5. Returning the final calculated pickup date
 
+## Using the Calendar
+
+The Pickup Schedule calendar entity can be:
+- Added to your Home Assistant calendar dashboard
+- Used in calendar-based automations
+- Viewed in the Calendar view (shows 3 months of pickups)
+- Synced to external calendars via CalDAV (if configured)
+
+**Calendar features:**
+- Events are named "Rumpke Pickup"
+- All-day events on your pickup dates
+- Automatically updates when service alerts or holidays change
+- No caching - dates always reflect current conditions
+
 ## Automation Examples
 
 ### Reminder Notification
@@ -157,8 +180,6 @@ automation:
 - Service alert parsing currently only detects "one-day delay" patterns
 - Multi-day service disruptions may not calculate perfectly
 - Holiday exceptions (e.g., "Lithopolis residents") are parsed but not applied to calculations
-- Integration naming shows region instead of city
-- Config flow labels show technical field names
 
 See [Issues](https://github.com/patrickjcash/rumpke-ha/issues) for active bug reports and feature requests.
 
@@ -166,8 +187,8 @@ See [Issues](https://github.com/patrickjcash/rumpke-ha/issues) for active bug re
 
 See [FUTURE_ENHANCEMENTS.md](docs/FUTURE_ENHANCEMENTS.md) for planned features including:
 
+- ✅ ~~Calendar integration~~ (Added in v0.3.2-beta)
 - Binary sensors for holiday/alert detection
-- Calendar integration
 - Multi-waste type support (trash, recycling, yard waste)
 - Historical tracking
 - Enhanced alert parsing
