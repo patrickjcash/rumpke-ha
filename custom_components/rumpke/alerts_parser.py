@@ -66,7 +66,9 @@ class ServiceAlertsParser:
     @staticmethod
     def _parse_alert_text(text: str) -> dict[str, Any]:
         """Parse alert text to extract delay information."""
-        text_lower = text.lower()
+        # Remove county prefix (e.g., "Delaware:" or "Hamilton County:")
+        clean_text = re.sub(r"^[^:]+:\s*", "", text)
+        text_lower = clean_text.lower()
 
         # Check for delay patterns
         has_delay = False
@@ -91,7 +93,7 @@ class ServiceAlertsParser:
         week_of = week_match.group(1) if week_match else None
 
         return {
-            "text": text,
+            "text": clean_text,
             "has_delay": has_delay,
             "delay_days": delay_days,
             "alert_type": alert_type,

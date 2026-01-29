@@ -9,7 +9,7 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers import selector
+import homeassistant.helpers.config_validation as cv
 
 from .const import DOMAIN, CONF_ZIP_CODE, CONF_SERVICE_DAY
 from .api import RumpkeApiClient
@@ -19,16 +19,9 @@ _LOGGER = logging.getLogger(__name__)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_ZIP_CODE): selector.TextSelector(
-            selector.TextSelectorConfig(
-                type=selector.TextSelectorType.TEXT,
-            ),
-        ),
-        vol.Required(CONF_SERVICE_DAY): selector.SelectSelector(
-            selector.SelectSelectorConfig(
-                options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-                mode=selector.SelectSelectorMode.DROPDOWN,
-            ),
+        vol.Required(CONF_ZIP_CODE): cv.string,
+        vol.Required(CONF_SERVICE_DAY): vol.In(
+            ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
         ),
     }
 )
