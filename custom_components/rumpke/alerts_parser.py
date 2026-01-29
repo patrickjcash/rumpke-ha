@@ -88,8 +88,8 @@ class ServiceAlertsParser:
             has_delay = True
             alert_type = "conditional"
 
-        # Extract week information
-        week_match = re.search(r"week of (\w+ \d+)", text_lower)
+        # Extract week information (handles "week of Jan. 26" or "week of Jan 26")
+        week_match = re.search(r"week of (\w+\.?\s+\d+)", text_lower)
         week_of = week_match.group(1) if week_match else None
 
         return {

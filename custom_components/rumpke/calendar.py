@@ -75,13 +75,17 @@ class RumpkePickupCalendar(CalendarEntity):
         if not self.coordinator.data:
             return []
 
+        # Limit to 3 months of events (90 days)
+        max_end_date = start_date.date() + timedelta(days=90)
+        limited_end_date = min(end_date.date(), max_end_date)
+
         # Generate all pickup dates in the range
         pickup_dates = generate_pickup_dates(
             self.coordinator.service_day,
             self.coordinator.data.get("holidays", []),
             self.coordinator.data.get("service_alert"),
             start_date.date(),
-            end_date.date(),
+            limited_end_date,
         )
 
         # Convert to CalendarEvent objects
