@@ -9,18 +9,26 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers import selector
 
 from .const import DOMAIN, CONF_ZIP_CODE, CONF_SERVICE_DAY
 from .api import RumpkeApiClient
+from .zipcode_lookup import get_county_from_zip
 
 _LOGGER = logging.getLogger(__name__)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_ZIP_CODE): cv.string,
-        vol.Required(CONF_SERVICE_DAY): vol.In(
-            ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        vol.Required(CONF_ZIP_CODE): selector.TextSelector(
+            selector.TextSelectorConfig(
+                type=selector.TextSelectorType.TEXT,
+            ),
+        ),
+        vol.Required(CONF_SERVICE_DAY): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            ),
         ),
     }
 )
@@ -37,8 +45,29 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     if not region_data or "region" not in region_data:
         raise ValueError("Zip code not in Rumpke service area")
 
+    # Get city/state from zip for better naming
+    zip_code = data[CONF_ZIP_CODE]
+    county_info = get_county_from_zip(zip_code)
+
+    if county_info:
+        county, state = county_info
+        # Try to get city name from uszipcode if available
+        try:
+            from uszipcode import SearchEngine
+            search = SearchEngine()
+            result = search.by_zipcode(zip_code)
+            if result and result.major_city:
+                city = result.major_city
+                title = f"Rumpke Waste Collection - {city}, {state} {zip_code}"
+            else:
+                title = f"Rumpke Waste Collection - {county} County, {state} {zip_code}"
+        except (ImportError, Exception):
+            title = f"Rumpke Waste Collection - {county} County, {state} {zip_code}"
+    else:
+        title = f"Rumpke Waste Collection - {region_data['region']} {zip_code}"
+
     return {
-        "title": f"Rumpke - {region_data['region']}",
+        "title": title,
         "region": region_data["region"],
     }
 

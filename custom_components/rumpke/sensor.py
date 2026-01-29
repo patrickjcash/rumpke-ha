@@ -9,6 +9,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, CONF_ZIP_CODE, CONF_SERVICE_DAY
 from .coordinator import RumpkeDataCoordinator
@@ -51,9 +53,19 @@ class RumpkeNextPickupSensor(SensorEntity):
     def __init__(self, coordinator: RumpkeDataCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
         self.coordinator = coordinator
-        self._attr_name = "Rumpke Next Pickup"
+        self._attr_name = "Next Pickup"
         self._attr_unique_id = f"rumpke_{entry.data[CONF_ZIP_CODE]}_next_pickup"
         self._attr_icon = "mdi:trash-can"
+        self._attr_has_entity_name = True
+
+        # Create device info
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.data[CONF_ZIP_CODE])},
+            name=entry.title,
+            manufacturer="Rumpke Waste & Recycling",
+            model="Waste Collection Service",
+            configuration_url="https://www.rumpke.com",
+        )
 
     @property
     def state(self):
@@ -70,7 +82,9 @@ class RumpkeNextPickupSensor(SensorEntity):
         if not next_date:
             return {}
 
-        days_until = (next_date - datetime.now().date()).days
+        # Use HA's timezone-aware now for days calculation
+        now = dt_util.now()
+        days_until = (next_date - now.date()).days
 
         attrs = {
             "service_day": self.coordinator.service_day,
@@ -111,9 +125,12 @@ class RumpkeNextPickupSensor(SensorEntity):
     def _calculate_next_pickup(self) -> datetime.date | None:
         """Calculate the next pickup date considering holidays."""
         if not self.coordinator.data:
+            _LOGGER.warning("No coordinator data available")
             return None
 
-        today = datetime.now().date()
+        # Use HA's timezone-aware now
+        now = dt_util.now()
+        today = now.date()
         service_weekday = DAYS.get(self.coordinator.service_day)
 
         if service_weekday is None:
@@ -126,18 +143,33 @@ class RumpkeNextPickupSensor(SensorEntity):
             days_ahead += 7
 
         next_pickup = today + timedelta(days=days_ahead)
+        _LOGGER.debug(
+            "Base calculation: today=%s (%s), service_day=%s, days_ahead=%d, next_pickup=%s",
+            today,
+            today.strftime("%A"),
+            self.coordinator.service_day,
+            days_ahead,
+            next_pickup,
+        )
 
         # Apply service alert delays first
         service_alert = self.coordinator.data.get("service_alert")
-        if service_alert and service_alert.get("has_delay"):
-            delay_days = service_alert.get("delay_days", 0)
-            if delay_days > 0:
-                next_pickup += timedelta(days=delay_days)
-                _LOGGER.debug(
-                    "Applied service alert delay of %d day(s), new date: %s",
-                    delay_days,
-                    next_pickup,
-                )
+        if service_alert:
+            _LOGGER.debug("Service alert data: %s", service_alert)
+            if service_alert.get("has_delay"):
+                delay_days = service_alert.get("delay_days", 0)
+                if delay_days > 0:
+                    next_pickup += timedelta(days=delay_days)
+                    _LOGGER.info(
+                        "Applied service alert delay of %d day(s): %s -> %s",
+                        delay_days,
+                        today,
+                        next_pickup,
+                    )
+            else:
+                _LOGGER.debug("Service alert present but has_delay=False")
+        else:
+            _LOGGER.debug("No service alert found in coordinator data")
 
         # Then apply holiday delays
         holidays = self.coordinator.data.get("holidays", [])
