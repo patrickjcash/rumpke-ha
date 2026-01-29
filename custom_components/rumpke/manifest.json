@@ -1,12 +1,12 @@
 {
   "domain": "rumpke",
   "name": "Rumpke Waste Collection",
-  "codeowners": ["@patrick"],
+  "codeowners": ["@patrickjcash"],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/yourusername/rumpke-ha",
+  "documentation": "https://github.com/patrickjcash/rumpke-ha",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/yourusername/rumpke-ha/issues",
+  "issue_tracker": "https://github.com/patrickjcash/rumpke-ha/issues",
   "requirements": ["beautifulsoup4==4.12.3", "aiohttp==3.9.1", "uszipcode==1.0.1"],
   "version": "0.1.0"
 }
