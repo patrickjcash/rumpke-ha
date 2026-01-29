@@ -63,7 +63,7 @@ class RumpkeNextPickupSensor(SensorEntity):
             identifiers={(DOMAIN, entry.data[CONF_ZIP_CODE])},
             name=entry.title,
             manufacturer="Rumpke Waste & Recycling",
-            model="Waste Collection Service",
+            model="Waste & Recycling Service",
             configuration_url="https://www.rumpke.com",
         )
 

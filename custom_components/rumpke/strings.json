@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Set up Rumpke Waste Collection",
+        "title": "Set up Rumpke Waste & Recycling",
         "description": "Enter your zip code and normal weekly service day.",
         "data": {
           "zip_code": "Zip Code",

@@ -11,7 +11,7 @@ import aiohttp
 from .api import RumpkeApiClient
 from .parser import HolidayScheduleParser
 from .alerts_parser import ServiceAlertsParser
-from .zipcode_lookup import get_county_from_zip
+from .utils import get_county_from_zip
 from .const import SCAN_INTERVAL_HOURS
 
 _LOGGER = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ class RumpkeDataCoordinator(DataUpdateCoordinator):
         super().__init__(
             hass,
             _LOGGER,
-            name="Rumpke Waste Collection",
+            name="Rumpke Waste & Recycling",
             update_interval=timedelta(hours=SCAN_INTERVAL_HOURS),
         )
 
@@ -63,16 +63,24 @@ class RumpkeDataCoordinator(DataUpdateCoordinator):
             # Get service alerts
             service_alert = None
             if self.county and self.state:
+                _LOGGER.debug("Fetching service alerts for %s County, %s", self.county, self.state)
                 alerts_html = await self.api.get_service_alerts_html()
                 if alerts_html:
                     service_alert = ServiceAlertsParser.parse(alerts_html, self.county, self.state)
                     if service_alert:
                         _LOGGER.info(
-                            "Service alert for %s County, %s: %s",
+                            "Service alert for %s County, %s: %s (delay: %s days)",
                             self.county,
                             self.state,
                             service_alert.get("alert_type"),
+                            service_alert.get("delay_days", 0),
                         )
+                    else:
+                        _LOGGER.debug("No service alerts found for %s County, %s", self.county, self.state)
+                else:
+                    _LOGGER.warning("Failed to fetch service alerts HTML")
+            else:
+                _LOGGER.warning("County/state not available, cannot fetch service alerts")
 
             return {
                 "holidays": holidays,
