@@ -1,32 +1,20 @@
 """Sensor platform for Rumpke."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 import logging
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, CONF_ZIP_CODE, CONF_SERVICE_DAY
+from .const import DOMAIN, CONF_ZIP_CODE
 from .coordinator import RumpkeDataCoordinator
+from .utils import calculate_next_pickup
 
 _LOGGER = logging.getLogger(__name__)
-
-# Day name to weekday number mapping
-DAYS = {
-    "Monday": 0,
-    "Tuesday": 1,
-    "Wednesday": 2,
-    "Thursday": 3,
-    "Friday": 4,
-    "Saturday": 5,
-    "Sunday": 6,
-}
 
 
 async def async_setup_entry(
@@ -35,15 +23,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Rumpke sensor."""
-    zip_code = entry.data[CONF_ZIP_CODE]
-    service_day = entry.data[CONF_SERVICE_DAY]
-
-    session = async_get_clientsession(hass)
-    coordinator = RumpkeDataCoordinator(hass, session, zip_code, service_day)
-
-    # Fetch initial data
-    await coordinator.async_config_entry_first_refresh()
-
+    coordinator = hass.data[DOMAIN][entry.entry_id]
     async_add_entities([RumpkeNextPickupSensor(coordinator, entry)])
 
 
@@ -128,76 +108,8 @@ class RumpkeNextPickupSensor(SensorEntity):
             _LOGGER.warning("No coordinator data available")
             return None
 
-        # Use HA's timezone-aware now
-        now = dt_util.now()
-        today = now.date()
-        service_weekday = DAYS.get(self.coordinator.service_day)
-
-        if service_weekday is None:
-            _LOGGER.error("Invalid service day: %s", self.coordinator.service_day)
-            return None
-
-        # Find the next occurrence of the service day (including today)
-        days_ahead = service_weekday - today.weekday()
-        if days_ahead < 0:  # Target day already happened this week (but not today)
-            days_ahead += 7
-
-        next_pickup = today + timedelta(days=days_ahead)
-        _LOGGER.debug(
-            "Base calculation: today=%s (%s), service_day=%s, days_ahead=%d, next_pickup=%s",
-            today,
-            today.strftime("%A"),
+        return calculate_next_pickup(
             self.coordinator.service_day,
-            days_ahead,
-            next_pickup,
+            self.coordinator.data.get("holidays", []),
+            self.coordinator.data.get("service_alert"),
         )
-
-        # Apply service alert delays first
-        service_alert = self.coordinator.data.get("service_alert")
-        if service_alert:
-            _LOGGER.debug("Service alert data: %s", service_alert)
-            if service_alert.get("has_delay"):
-                delay_days = service_alert.get("delay_days", 0)
-                if delay_days > 0:
-                    next_pickup += timedelta(days=delay_days)
-                    _LOGGER.info(
-                        "Applied service alert delay of %d day(s): %s -> %s",
-                        delay_days,
-                        today,
-                        next_pickup,
-                    )
-            else:
-                _LOGGER.debug("Service alert present but has_delay=False")
-        else:
-            _LOGGER.debug("No service alert found in coordinator data")
-
-        # Then apply holiday delays
-        holidays = self.coordinator.data.get("holidays", [])
-        next_pickup = self._apply_holiday_delays(next_pickup, holidays)
-
-        return next_pickup
-
-    def _apply_holiday_delays(self, pickup_date: datetime.date, holidays: list) -> datetime.date:
-        """Apply holiday delays to the pickup date."""
-        # Check for holidays in the week of the pickup
-        week_start = pickup_date - timedelta(days=pickup_date.weekday())
-        week_end = week_start + timedelta(days=6)
-
-        for holiday in holidays:
-            if not holiday.get("has_delay") or not holiday.get("date"):
-                continue
-
-            holiday_date = holiday["date"]
-
-            # If holiday is in the same week and before/on pickup day
-            if week_start <= holiday_date <= week_end and holiday_date <= pickup_date:
-                # Delay by one day
-                pickup_date += timedelta(days=1)
-                _LOGGER.debug(
-                    "Pickup delayed by %s on %s, new date: %s",
-                    holiday["name"],
-                    holiday_date,
-                    pickup_date,
-                )
-
-        return pickup_date
