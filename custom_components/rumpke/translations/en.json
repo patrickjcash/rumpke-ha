@@ -1,0 +1,21 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Rumpke Waste & Recycling",
+        "description": "Enter your zip code and normal weekly service day.",
+        "data": {
+          "zip_code": "Zip Code",
+          "service_day": "Service Day"
+        }
+      }
+    },
+    "error": {
+      "invalid_zip": "This zip code is not in Rumpke's service area.",
+      "unknown": "Unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This zip code is already configured."
+    }
+  }
+}

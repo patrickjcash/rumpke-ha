@@ -133,9 +133,9 @@ def _is_pickup_in_alert_week(pickup_date: datetime.date, week_of: str) -> bool:
         return result
 
     except Exception as e:
-        _LOGGER.warning("Failed to parse week_of '%s': %s - applying delay to all weeks", week_of, e)
-        # If we can't parse, assume it applies (safer to delay than miss a delay)
-        return True
+        _LOGGER.warning("Failed to parse week_of '%s': %s - skipping delay for this pickup", week_of, e)
+        # If we can't parse, don't apply the delay (safer to skip than incorrectly delay all weeks)
+        return False
 
 
 def apply_holiday_delays(pickup_date: datetime.date, holidays: list) -> datetime.date:
