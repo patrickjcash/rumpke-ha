@@ -75,8 +75,13 @@ class RumpkePickupCalendar(CalendarEntity):
         if not self.coordinator.data:
             return []
 
+        # Never generate events before today
+        from homeassistant.util import dt as dt_util
+        today = dt_util.now().date()
+        effective_start = max(start_date.date(), today)
+
         # Limit to 3 months of events (90 days)
-        max_end_date = start_date.date() + timedelta(days=90)
+        max_end_date = effective_start + timedelta(days=90)
         limited_end_date = min(end_date.date(), max_end_date)
 
         # Generate all pickup dates in the range
@@ -84,7 +89,7 @@ class RumpkePickupCalendar(CalendarEntity):
             self.coordinator.service_day,
             self.coordinator.data.get("holidays", []),
             self.coordinator.data.get("service_alert"),
-            start_date.date(),
+            effective_start,
             limited_end_date,
         )
 
