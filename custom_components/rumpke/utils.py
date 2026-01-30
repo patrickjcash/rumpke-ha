@@ -191,6 +191,39 @@ def calculate_next_pickup(
         _LOGGER.error("Invalid service day: %s", service_day)
         return None
 
+    # Check if a recent pickup (from this week) was delayed to today or a future date
+    days_back = from_date.weekday() - service_weekday
+    if days_back > 0:  # Service day was earlier this week
+        recent_pickup = from_date - timedelta(days=days_back)
+
+        # Calculate what this recent pickup would be with delays
+        delayed_pickup = recent_pickup
+
+        # Apply service alert delays
+        if service_alert and service_alert.get("has_delay"):
+            week_of = service_alert.get("week_of")
+            if week_of:
+                if _is_pickup_in_alert_week(recent_pickup, week_of):
+                    delay_days = service_alert.get("delay_days", 0)
+                    if delay_days > 0:
+                        delayed_pickup += timedelta(days=delay_days)
+            else:
+                delay_days = service_alert.get("delay_days", 0)
+                if delay_days > 0:
+                    delayed_pickup += timedelta(days=delay_days)
+
+        # Apply holiday delays
+        delayed_pickup = apply_holiday_delays(delayed_pickup, holidays)
+
+        # If the delayed pickup is today or in the future, return it
+        if delayed_pickup >= from_date:
+            _LOGGER.debug(
+                "Found recent pickup from %s delayed to %s",
+                recent_pickup,
+                delayed_pickup,
+            )
+            return delayed_pickup
+
     # Find the next occurrence of the service day (including today)
     days_ahead = service_weekday - from_date.weekday()
     if days_ahead < 0:  # Target day already happened this week
