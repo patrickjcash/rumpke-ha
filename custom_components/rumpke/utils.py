@@ -285,36 +285,16 @@ def generate_pickup_dates(
     """
     pickup_dates = []
     current_date = start_date
-    max_iterations = 52  # Safety limit: ~1 year of weekly pickups
 
-    # Generate pickups until we exceed the end date
-    iteration = 0
-    while current_date <= end_date and iteration < max_iterations:
-        iteration += 1
-
+    while current_date <= end_date:
         next_pickup = calculate_next_pickup(
             service_day, holidays, service_alert, current_date
         )
 
-        if next_pickup is None:
-            break
-
-        # Stop if next_pickup is beyond our end date
-        if next_pickup > end_date:
+        if next_pickup is None or next_pickup > end_date:
             break
 
         pickup_dates.append(next_pickup)
-
-        # Safety check: ensure we're moving forward
-        if next_pickup <= current_date:
-            _LOGGER.error(
-                "Pickup date calculation not progressing: current=%s, next=%s",
-                current_date,
-                next_pickup,
-            )
-            break
-
-        # Move to the day after this pickup to find the next one
         current_date = next_pickup + timedelta(days=1)
 
     return pickup_dates
