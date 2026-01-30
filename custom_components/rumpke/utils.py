@@ -285,16 +285,22 @@ def generate_pickup_dates(
     """
     pickup_dates = []
     current_date = start_date
+    count = 0
+    max_iterations = 14
 
-    while current_date <= end_date:
+    while count < max_iterations:
         next_pickup = calculate_next_pickup(
             service_day, holidays, service_alert, current_date
         )
 
-        if next_pickup is None or next_pickup > end_date:
+        if next_pickup is None:
+            break
+
+        if next_pickup > end_date:
             break
 
         pickup_dates.append(next_pickup)
         current_date = next_pickup + timedelta(days=1)
+        count += 1
 
     return pickup_dates
