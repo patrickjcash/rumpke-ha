@@ -1,7 +1,7 @@
 """Data coordinator for Rumpke."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 import logging
 
 from homeassistant.core import HomeAssistant
@@ -87,7 +87,6 @@ class RumpkeDataCoordinator(DataUpdateCoordinator):
                 "service_alert": service_alert,
                 "county": self.county,
                 "state": self.state,
-                "last_update": datetime.now(),
             }
 
         except Exception as err:

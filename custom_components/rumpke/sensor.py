@@ -8,6 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, CONF_ZIP_CODE
@@ -27,12 +28,12 @@ async def async_setup_entry(
     async_add_entities([RumpkeNextPickupSensor(coordinator, entry)])
 
 
-class RumpkeNextPickupSensor(SensorEntity):
+class RumpkeNextPickupSensor(CoordinatorEntity, SensorEntity):
     """Sensor for next Rumpke pickup date."""
 
     def __init__(self, coordinator: RumpkeDataCoordinator, entry: ConfigEntry) -> None:
         """Initialize the sensor."""
-        self.coordinator = coordinator
+        super().__init__(coordinator)
         self._attr_name = "Next Pickup"
         self._attr_unique_id = f"rumpke_{entry.data[CONF_ZIP_CODE]}_next_pickup"
         self._attr_icon = "mdi:trash-can"
@@ -71,7 +72,6 @@ class RumpkeNextPickupSensor(SensorEntity):
             "zip_code": self.coordinator.zip_code,
             "days_until_pickup": days_until,
             "pickup_date": next_date.strftime("%A, %B %d, %Y"),
-            "last_update": self.coordinator.data.get("last_update"),
         }
 
         # Add service alert info if present
@@ -91,16 +91,6 @@ class RumpkeNextPickupSensor(SensorEntity):
     def available(self) -> bool:
         """Return if entity is available."""
         return self.coordinator.last_update_success
-
-    async def async_update(self):
-        """Update the sensor."""
-        await self.coordinator.async_request_refresh()
-
-    async def async_added_to_hass(self):
-        """When entity is added to hass."""
-        self.async_on_remove(
-            self.coordinator.async_add_listener(self.async_write_ha_state)
-        )
 
     def _calculate_next_pickup(self) -> datetime.date | None:
         """Calculate the next pickup date considering holidays."""
